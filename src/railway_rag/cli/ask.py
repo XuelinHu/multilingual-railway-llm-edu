@@ -2,83 +2,11 @@ from __future__ import annotations
 
 import argparse
 
+from railway_rag.agent.formatter import format_answer
+from railway_rag.agent.tools import classify_query, infer_record_types, search_regulation, search_term_dictionary
 from railway_rag.config import load_config
-from railway_rag.qa.answering import build_answer
 from railway_rag.retrieval.vector_store import VectorStore
-from railway_rag.utils import has_cjk, normalize_text
-
-
-def infer_record_types(query: str) -> list[str] | None:
-    lowered = query.lower()
-    translation_markers = [
-        "英文",
-        "中文",
-        "怎么说",
-        "翻译",
-        "对应",
-        "what does",
-        "translate",
-        "in chinese",
-        "in english",
-    ]
-    if any(marker in lowered for marker in translation_markers):
-        return ["glossary_term"]
-    return ["regulation_clause"]
-
-
-def extract_translation_candidate(query: str) -> str:
-    normalized = normalize_text(query)
-    if has_cjk(normalized):
-        candidate = normalized
-        for marker in ["英文怎么说", "中文怎么说", "英文", "中文", "怎么说", "翻译", "对应"]:
-            candidate = candidate.replace(marker, " ")
-        return normalize_text(candidate).strip(" ?？")
-
-    lowered = normalized.lower()
-    for marker in [
-        "what does",
-        "what is",
-        "mean in chinese",
-        "mean in english",
-        "in chinese",
-        "in english",
-        "translate",
-        "meaning of",
-    ]:
-        lowered = lowered.replace(marker, " ")
-    return normalize_text(lowered).strip(" ?？")
-
-
-def exact_glossary_hits(vector_store: VectorStore, query: str) -> list[dict]:
-    candidate = extract_translation_candidate(query)
-    if not candidate:
-        return []
-
-    candidate_norm = candidate.lower()
-    matches = []
-    for record in vector_store.records:
-        if record.get("record_type") != "glossary_term":
-            continue
-        zh_term = normalize_text(str(record.get("term_zh", "")))
-        en_term = normalize_text(str(record.get("term_en", "")))
-        zh_norm = zh_term.lower()
-        en_norm = en_term.lower()
-
-        exact = candidate_norm == zh_norm or candidate_norm == en_norm
-        contains = candidate_norm in zh_norm or candidate_norm in en_norm or zh_norm in candidate_norm or en_norm in candidate_norm
-        if not (exact or contains):
-            continue
-
-        score = 10.0 if exact else 8.0
-        if record.get("category_zh") and record.get("category_zh") != "通用词汇":
-            score += 0.5
-        score -= (len(zh_term) + len(en_term)) * 0.01
-        hit = dict(record)
-        hit["score"] = round(score, 6)
-        matches.append(hit)
-
-    matches.sort(key=lambda item: item["score"], reverse=True)
-    return matches[:10]
+from railway_rag.safety.risk import risk_check
 
 
 def main() -> None:
@@ -91,13 +19,18 @@ def main() -> None:
     config = load_config(args.config)
     vector_store = VectorStore.load(config["paths"]["vector_index"])
     top_k = args.top_k or int(config["retrieval"].get("top_k", 5))
-    record_types = infer_record_types(args.query)
-    hits = vector_store.search(args.query, top_k=max(top_k * 8, 30), record_types=record_types)
+    query_type = classify_query(args.query)
+    record_types = infer_record_types(query_type)
+    risk_result = risk_check(args.query)
+
     if record_types == ["glossary_term"]:
-        exact_hits = exact_glossary_hits(vector_store, args.query)
-        seen_ids = {hit["record_id"] for hit in exact_hits}
-        hits = exact_hits + [hit for hit in hits if hit["record_id"] not in seen_ids]
-    answer = build_answer(args.query, hits)
+        hits = search_term_dictionary(vector_store, args.query, top_k=max(top_k, 8))
+    elif query_type == "paper":
+        hits = []
+    else:
+        hits = search_regulation(vector_store, args.query, top_k=top_k)
+
+    answer = format_answer(query_type, args.query, hits, risk_result)
 
     print("Answer:")
     print(answer["answer"])

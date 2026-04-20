@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from typing import Dict, List
 
 from railway_rag.utils import has_cjk, normalize_text, simple_query_terms, split_sentences
@@ -7,6 +8,15 @@ from railway_rag.utils import has_cjk, normalize_text, simple_query_terms, split
 
 def _rerank_hits(query: str, hits: List[Dict[str, object]]) -> List[Dict[str, object]]:
     query_terms = simple_query_terms(query)
+    query_norm = normalize_text(query).lower()
+    key_query = query_norm
+    for marker in ["什么", "哪些", "如何", "怎么", "是否", "吗", "么", "？", "?", "请问"]:
+        key_query = key_query.replace(marker, " ")
+    content_terms = [
+        term.lower()
+        for term in re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]{2,}", normalize_text(key_query))
+        if len(term.strip()) >= 2
+    ]
     if not query_terms:
         return hits
 
@@ -25,8 +35,25 @@ def _rerank_hits(query: str, hits: List[Dict[str, object]]) -> List[Dict[str, ob
         ).lower()
         unique_overlap = len({term for term in query_terms if term and term in haystack})
         total_overlap = sum(haystack.count(term) for term in query_terms if term)
+        evidence_priority = float(hit.get("evidence_priority", 0.0))
+        risk_bonus = 1.0 if hit.get("risk_level") == "high" else 0.5 if hit.get("risk_level") == "medium" else 0.0
+        content_type_bonus = 1.5 if hit.get("content_type") in {"restriction", "precondition", "rule", "emergency"} else 0.0
+        phrase_bonus = 0.0
+        if key_query.strip() and key_query.strip() in haystack:
+            phrase_bonus += 10.0
+        content_bonus = sum(3.0 for term in content_terms if term and term in haystack)
         length_bonus = min(len(haystack), 200) / 200.0
-        combined = unique_overlap * 2.0 + total_overlap * 0.2 + float(hit.get("score", 0.0)) + length_bonus
+        combined = (
+            unique_overlap * 2.0
+            + total_overlap * 0.2
+            + content_bonus
+            + phrase_bonus
+            + evidence_priority * 1.2
+            + risk_bonus
+            + content_type_bonus
+            + float(hit.get("score", 0.0))
+            + length_bonus
+        )
         ranked.append((combined, hit))
 
     ranked.sort(key=lambda item: item[0], reverse=True)

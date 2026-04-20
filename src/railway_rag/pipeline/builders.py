@@ -31,6 +31,78 @@ GLOSSARY_CATEGORY_ANCHORS: List[Tuple[str, str]] = [
     ("相关科学", "Related sciences"),
 ]
 
+HIGH_RISK_PATTERNS = ["停电", "送电", "带电", "倒闸", "接地", "验电", "应急", "故障处置", "调度命令", "高压"]
+MEDIUM_RISK_PATTERNS = ["检修", "维修", "巡视", "巡检", "试验", "操作", "异常", "排查", "流程"]
+PROHIBITION_PATTERNS = ["禁止", "不得", "严禁"]
+MANDATORY_PATTERNS = ["必须", "应", "应当"]
+EMERGENCY_PATTERNS = ["应急", "事故", "故障", "异常"]
+PRECONDITION_PATTERNS = ["前", "之前", "满足", "条件", "准备", "确认"]
+
+
+def _infer_regulation_risk(text: str) -> str:
+    if any(pattern in text for pattern in HIGH_RISK_PATTERNS):
+        return "high"
+    if any(pattern in text for pattern in MEDIUM_RISK_PATTERNS):
+        return "medium"
+    return "low"
+
+
+def _infer_content_type(text: str) -> str:
+    if any(pattern in text for pattern in PROHIBITION_PATTERNS):
+        return "restriction"
+    if any(pattern in text for pattern in EMERGENCY_PATTERNS):
+        return "emergency"
+    if any(pattern in text for pattern in PRECONDITION_PATTERNS):
+        return "precondition"
+    if "流程" in text or "步骤" in text:
+        return "procedure"
+    if any(pattern in text for pattern in MANDATORY_PATTERNS):
+        return "rule"
+    return "description"
+
+
+def _evidence_priority(text: str) -> int:
+    score = 0
+    score += sum(3 for pattern in PROHIBITION_PATTERNS if pattern in text)
+    score += sum(2 for pattern in ["必须", "应当", "操作前", "应急处置"] if pattern in text)
+    score += sum(1 for pattern in ["应", "注意", "检查"] if pattern in text)
+    return score
+
+
+def _extract_keywords(*parts: str, limit: int = 8) -> List[str]:
+    keywords: List[str] = []
+    seen = set()
+    for part in parts:
+        for token in re.findall(r"[A-Za-z]{2,}|[\u3400-\u9fff]{2,}", normalize_text(part)):
+            if token in seen:
+                continue
+            seen.add(token)
+            keywords.append(token)
+            if len(keywords) >= limit:
+                return keywords
+    return keywords
+
+
+def _extract_abbreviation_and_full_form(term_en: str) -> Tuple[str, str]:
+    match = re.search(r"\(([^()]{2,16})\)", term_en)
+    if match:
+        return match.group(1).strip(), normalize_text(term_en[: match.start()])
+    tokens = re.findall(r"[A-Za-z]+", term_en)
+    if len(tokens) >= 2:
+        abbreviation = "".join(token[0].upper() for token in tokens if token)
+        if len(abbreviation) >= 2:
+            return abbreviation, normalize_text(term_en)
+    return "", normalize_text(term_en)
+
+
+def _build_aliases(term_zh: str, term_en: str, abbreviation: str, full_form: str) -> List[str]:
+    aliases: List[str] = []
+    for item in [term_zh, term_en, abbreviation, full_form]:
+        normalized = normalize_text(item)
+        if normalized and normalized not in aliases:
+            aliases.append(normalized)
+    return aliases
+
 
 def _clean_heading_suffix(text: str) -> str:
     text = re.sub(r"\.{3,}\s*\d+$", "", text)
@@ -177,6 +249,7 @@ def build_regulation_records(document_config: Dict[str, str]) -> List[Dict[str, 
             {
                 "record_id": f"{source_id}_clause_{clause_counter:04d}",
                 "record_type": "regulation_clause",
+                "knowledge_channel": "regulation",
                 "source_id": source_id,
                 "source_title": source_title,
                 "source_file": document_config["file"],
@@ -192,8 +265,16 @@ def build_regulation_records(document_config: Dict[str, str]) -> List[Dict[str, 
                 "en_text": en_text,
                 "term_zh": "",
                 "term_en": "",
+                "abbreviation": "",
+                "full_form": "",
+                "aliases": [],
+                "notes": "",
                 "category_zh": "",
                 "category_en": "",
+                "content_type": _infer_content_type(zh_text),
+                "risk_level": _infer_regulation_risk(zh_text),
+                "keywords": _extract_keywords(current_part_zh, current_chapter_zh, current_appendix_zh, zh_text),
+                "evidence_priority": _evidence_priority(zh_text),
                 "source_label": source_label,
                 "retrieval_text": normalize_text(" ".join([source_title, section_path, zh_text, en_text])),
             }
@@ -310,6 +391,8 @@ def build_glossary_records(document_config: Dict[str, str]) -> List[Dict[str, st
         for term_zh, term_en in _split_glossary_pairs(line):
             if _is_low_quality_glossary_pair(term_zh, term_en):
                 continue
+            abbreviation, full_form = _extract_abbreviation_and_full_form(term_en)
+            aliases = _build_aliases(term_zh, term_en, abbreviation, full_form)
             term_counter += 1
             source_label = " > ".join(
                 item for item in [source_title, current_category_zh or "未分类术语", f"术语 {term_counter}"] if item
@@ -318,6 +401,7 @@ def build_glossary_records(document_config: Dict[str, str]) -> List[Dict[str, st
                 {
                     "record_id": f"{source_id}_term_{term_counter:05d}",
                     "record_type": "glossary_term",
+                    "knowledge_channel": "terminology",
                     "source_id": source_id,
                     "source_title": source_title,
                     "source_file": document_config["file"],
@@ -333,11 +417,19 @@ def build_glossary_records(document_config: Dict[str, str]) -> List[Dict[str, st
                     "en_text": term_en,
                     "term_zh": term_zh,
                     "term_en": term_en,
+                    "abbreviation": abbreviation,
+                    "full_form": full_form,
+                    "aliases": aliases,
+                    "notes": f"标准术语，类别为{current_category_zh}。",
                     "category_zh": current_category_zh,
                     "category_en": current_category_en,
+                    "content_type": "definition",
+                    "risk_level": "low",
+                    "keywords": _extract_keywords(current_category_zh, term_zh, term_en, abbreviation, full_form),
+                    "evidence_priority": 1,
                     "source_label": source_label,
                     "retrieval_text": normalize_text(
-                        " ".join([source_title, current_category_zh, current_category_en, term_zh, term_en])
+                        " ".join([source_title, current_category_zh, current_category_en, term_zh, term_en, abbreviation, full_form])
                     ),
                 }
             )
