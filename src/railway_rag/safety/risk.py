@@ -13,8 +13,6 @@ HIGH_RISK_MARKERS = [
     "验电",
     "接地",
     "高压",
-    "接触网",
-    "牵引变电所",
     "应急处置",
     "抢修",
     "故障处理",
@@ -65,4 +63,3 @@ def safety_notice(risk_result: Dict[str, object]) -> str:
     if risk_result["risk_level"] == "medium":
         return "该问题涉及运维流程或故障排查，建议结合现场规章和作业许可制度执行。"
     return ""
-

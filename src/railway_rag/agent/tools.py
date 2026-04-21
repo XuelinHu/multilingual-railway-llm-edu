@@ -77,6 +77,27 @@ def extract_translation_candidate(query: str) -> str:
     return normalize_text(lowered).strip(" ?？")
 
 
+def extract_term_candidates(query: str) -> List[str]:
+    normalized = normalize_text(query)
+    lowered = normalized.lower()
+    for marker in ["是否对应", "是否等价", "是否规范", "英文是什么", "中文是什么", "怎么说", "翻译", "对应", "term", "translate"]:
+        lowered = lowered.replace(marker, " ")
+    splitter_patterns = [r"\s+and\s+", r"\s+or\s+", r"\s+vs\.?\s+", r"\s*[与和及/]\s*", r"\s*[,，;；]\s*"]
+    candidates = [lowered]
+    for pattern in splitter_patterns:
+        next_candidates: List[str] = []
+        for item in candidates:
+            parts = re.split(pattern, item)
+            next_candidates.extend(parts)
+        candidates = next_candidates
+    cleaned = []
+    for candidate in candidates:
+        normalized_candidate = normalize_text(candidate).strip(" ?？")
+        if normalized_candidate and normalized_candidate not in cleaned:
+            cleaned.append(normalized_candidate)
+    return cleaned or [extract_translation_candidate(query)]
+
+
 def _term_aliases(record: Dict[str, object]) -> List[str]:
     record_aliases = record.get("aliases") or []
     aliases = [
@@ -96,8 +117,8 @@ def _term_aliases(record: Dict[str, object]) -> List[str]:
 
 
 def search_term_dictionary(vector_store: VectorStore, query: str, top_k: int = 8) -> List[Dict[str, object]]:
-    candidate = extract_translation_candidate(query)
-    candidate_norm = candidate.lower()
+    candidates = extract_term_candidates(query)
+    candidate_norms = [candidate.lower() for candidate in candidates if candidate]
     matches: List[Dict[str, object]] = []
 
     for record in vector_store.records:
@@ -105,12 +126,20 @@ def search_term_dictionary(vector_store: VectorStore, query: str, top_k: int = 8
             continue
         aliases = _term_aliases(record)
         alias_norms = [alias.lower() for alias in aliases]
-        exact = any(candidate_norm and candidate_norm == alias for alias in alias_norms)
-        contains = any(candidate_norm and (candidate_norm in alias or alias in candidate_norm) for alias in alias_norms)
+        exact_matches = sum(1 for candidate_norm in candidate_norms for alias in alias_norms if candidate_norm and candidate_norm == alias)
+        contains_matches = sum(
+            1
+            for candidate_norm in candidate_norms
+            for alias in alias_norms
+            if candidate_norm and (candidate_norm in alias or alias in candidate_norm)
+        )
+        exact = exact_matches > 0
+        contains = contains_matches > 0
         if not (exact or contains):
             continue
 
         score = 10.0 if exact else 8.0
+        score += exact_matches * 2.0 + contains_matches * 0.5
         if record.get("category_zh") and record.get("category_zh") != "通用词汇":
             score += 0.5
         score -= sum(len(alias) for alias in aliases[:2]) * 0.01
