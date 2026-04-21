@@ -41,3 +41,9 @@ htmlcov/
 # Generated data and indexes
 data/
 output/
+
+# Local corpus files
+corpus/*.docx
+corpus/*.doc
+corpus/*.pdf
+!corpus/README.md
