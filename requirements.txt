@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 python-docx>=1.1.2
 PyYAML>=6.0.1
 tqdm>=4.66.0
@@ -19,3 +20,7 @@ rich>=13.7.0
 evaluate>=0.4.2
 rouge-score>=0.1.2
 sacrebleu>=2.4.0
+=======
+PyYAML>=6.0
+scikit-learn>=1.4
+>>>>>>> 6afbc0f723dd75dc2e2a721739bd855fadbe6ebd

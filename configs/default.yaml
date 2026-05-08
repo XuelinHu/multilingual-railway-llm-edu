@@ -1,0 +1,27 @@
+project_name: multilingual-railway-llm-edu
+
+paths:
+  corpus_dir: corpus
+  output_dir: output
+  unified_jsonl: output/unified_records.jsonl
+  unified_pretty_json: output/unified_records.pretty.json
+  vector_index: output/vector_index.joblib
+
+documents:
+  regulation:
+    file: corpus/规章43：ECRL牵引供电设备运行维护管理办法（修订）_zh2en_transResult.docx
+    source_id: regulation_ecrl_43
+    title: ECRL牵引供电设备运行维护管理办法
+  glossary:
+    file: corpus/铁路中英文词汇（全）.docx
+    source_id: glossary_railway_dictionary
+    title: 铁路技术标准中英文词汇
+
+retrieval:
+  top_k: 5
+  vectorizer:
+    analyzer: char
+    ngram_range: [2, 4]
+    min_df: 1
+    lowercase: true
+    sublinear_tf: true
