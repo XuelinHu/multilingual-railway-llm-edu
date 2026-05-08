@@ -1,0 +1,27 @@
+raw_dir: corpus
+processed_dir: data/processed
+instruction_dir: data/instructions
+
+documents:
+  - id: ecrl_power_maintenance
+    path: corpus/规章43：ECRL牵引供电设备运行维护管理办法（修订）_zh2en_transResult.docx
+    type: regulation
+    language: zh_en
+  - id: railway_glossary
+    path: corpus/铁路中英文词汇（全）.docx
+    type: glossary
+    language: zh_en
+
+cleaning:
+  min_paragraph_chars: 2
+  normalize_whitespace: true
+
+chunking:
+  max_chars: 900
+  overlap_chars: 120
+  respect_articles: true
+
+instructions:
+  train_ratio: 0.9
+  seed: 42
+  include_citation_tasks: true

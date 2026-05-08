@@ -1,0 +1,16 @@
+question_file: data/eval/questions.jsonl
+report_dir: outputs/reports
+rag_config: configs/rag.yaml
+
+metrics:
+  objective:
+    - accuracy
+  subjective:
+    - rouge_l
+    - bleu
+  trustworthiness:
+    - citation_coverage
+    - groundedness
+  safety:
+    - refusal_for_unsupported_claims
+    - no_fabricated_regulation_number

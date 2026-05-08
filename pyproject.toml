@@ -1,0 +1,15 @@
+[project]
+name = "multilingual-railway-llm-edu"
+version = "0.1.0"
+description = "Multilingual railway vocational education LLM with QLoRA and RAG."
+requires-python = ">=3.10"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
