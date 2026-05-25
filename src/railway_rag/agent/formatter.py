@@ -45,13 +45,15 @@ def _extract_abbreviation(term_en: str) -> tuple[str, str]:
     return "", term_en
 
 
-def format_term_answer(query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object]) -> Dict[str, object]:
+def format_term_answer(
+    query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object], use_risk_calibration: bool
+) -> Dict[str, object]:
     if not hits:
         return {"answer": "当前术语词典中未检索到充分依据。", "citations": []}
 
     hit = hits[0]
     abbreviation, full_form = _extract_abbreviation(str(hit.get("term_en", "")))
-    notes = safety_notice(risk_result)
+    notes = safety_notice(risk_result) if use_risk_calibration else ""
     answer = "\n".join(
         [
             "1. 中文术语",
@@ -71,7 +73,13 @@ def format_term_answer(query: str, hits: List[Dict[str, object]], risk_result: D
     return {"answer": answer, "citations": _format_citations(hits, limit=1)}
 
 
-def format_regulation_answer(query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object]) -> Dict[str, object]:
+def format_regulation_answer(
+    query: str,
+    hits: List[Dict[str, object]],
+    risk_result: Dict[str, object],
+    use_rerank: bool,
+    use_risk_calibration: bool,
+) -> Dict[str, object]:
     if not hits:
         answer = "\n".join(
             [
@@ -84,12 +92,12 @@ def format_regulation_answer(query: str, hits: List[Dict[str, object]], risk_res
                 "4. 适用条件 / 限制条件",
                 "当前无法确认。",
                 "5. 风险提示",
-                safety_notice(risk_result) or "规章类问题应以正式制度文本为准。",
+                (safety_notice(risk_result) if use_risk_calibration else "") or "规章类问题应以正式制度文本为准。",
             ]
         )
         return {"answer": answer, "citations": []}
 
-    ranked_hits = _rerank_hits(query, hits)
+    ranked_hits = _rerank_hits(query, hits) if use_rerank else hits
     top_hit = ranked_hits[0]
     combined_text = " ".join(str(hit.get("zh_text") or hit.get("en_text") or "") for hit in ranked_hits[:3])
     allow_markers = ["是否允许", "允许", "可否", "能否", "可以吗"]
@@ -123,20 +131,28 @@ def format_regulation_answer(query: str, hits: List[Dict[str, object]], risk_res
             "4. 适用条件 / 限制条件",
             normalize_text(str(top_hit.get("section_path", ""))) or "请结合具体章节场景判断。",
             "5. 限制条件",
-            "若条文未直接覆盖具体作业条件，则不得将该回答视为现场操作授权。" if risk_result["is_high_risk"] else "应结合更具体的设备状态、章节语境和现场流程判断。",
+            "若条文未直接覆盖具体作业条件，则不得将该回答视为现场操作授权。"
+            if use_risk_calibration and risk_result["is_high_risk"]
+            else "应结合更具体的设备状态、章节语境和现场流程判断。",
             "6. 证据类型说明",
             f"直接证据：{top_hit.get('content_type', '未标注')}；检索轨迹：{_format_trace(top_hit)}。",
             "7. 推断说明",
             "除直接摘录条文外，其余归纳内容仅是对检索片段的整理，不应替代正式制度解释。",
             "8. 风险提示",
-            safety_notice(risk_result) or "回答基于检索到的规章片段，未检索到的制度要求不应擅自补充。",
+            (safety_notice(risk_result) if use_risk_calibration else "") or "回答基于检索到的规章片段，未检索到的制度要求不应擅自补充。",
         ]
     )
     return {"answer": answer, "citations": _format_citations(ranked_hits)}
 
 
-def format_fault_answer(query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object]) -> Dict[str, object]:
-    ranked_hits = _rerank_hits(query, hits)
+def format_fault_answer(
+    query: str,
+    hits: List[Dict[str, object]],
+    risk_result: Dict[str, object],
+    use_rerank: bool,
+    use_risk_calibration: bool,
+) -> Dict[str, object]:
+    ranked_hits = _rerank_hits(query, hits) if use_rerank else hits
     snippets = [
         _best_snippet(query, str(hit.get("zh_text") or hit.get("en_text") or "")) for hit in ranked_hits[:3]
     ]
@@ -154,20 +170,22 @@ def format_fault_answer(query: str, hits: List[Dict[str, object]], risk_result: 
             "5. 推断说明",
             "可能原因与排查路径是基于检索片段整理的辅助分析，若条文未明确规定，应视为经验性推断。",
             "6. 现场处置提示",
-            safety_notice(risk_result) or "故障分析仅作辅助判断，不替代现场组织措施。",
+            (safety_notice(risk_result) if use_risk_calibration else "") or "故障分析仅作辅助判断，不替代现场组织措施。",
         ]
     )
     return {"answer": answer, "citations": _format_citations(ranked_hits)}
 
 
-def format_bilingual_answer(query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object]) -> Dict[str, object]:
+def format_bilingual_answer(
+    query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object], use_risk_calibration: bool
+) -> Dict[str, object]:
     if not hits:
         return {"answer": "当前知识库中未检索到充分依据。", "citations": []}
 
     hit = hits[0]
     zh_answer = str(hit.get("zh_text") or hit.get("term_zh") or "")
     en_answer = str(hit.get("en_text") or hit.get("term_en") or "")
-    notes = safety_notice(risk_result) or "英文表达优先采用术语词典中的标准写法。"
+    notes = (safety_notice(risk_result) if use_risk_calibration else "") or "英文表达优先采用术语词典中的标准写法。"
     answer = "\n".join(
         [
             "1. 中文答案",
@@ -207,13 +225,22 @@ def format_paper_answer(query: str) -> Dict[str, object]:
     return {"answer": answer, "citations": []}
 
 
-def format_answer(query_type: str, query: str, hits: List[Dict[str, object]], risk_result: Dict[str, object]) -> Dict[str, object]:
+def format_answer(
+    query_type: str,
+    query: str,
+    hits: List[Dict[str, object]],
+    risk_result: Dict[str, object],
+    options: Dict[str, object] | None = None,
+) -> Dict[str, object]:
+    options = options or {}
+    use_rerank = bool(options.get("use_rerank", True))
+    use_risk_calibration = bool(options.get("use_risk_calibration", True))
     if query_type == "term":
-        return format_term_answer(query, hits, risk_result)
+        return format_term_answer(query, hits, risk_result, use_risk_calibration)
     if query_type == "fault":
-        return format_fault_answer(query, hits, risk_result)
+        return format_fault_answer(query, hits, risk_result, use_rerank, use_risk_calibration)
     if query_type == "bilingual":
-        return format_bilingual_answer(query, hits, risk_result)
+        return format_bilingual_answer(query, hits, risk_result, use_risk_calibration)
     if query_type == "paper":
         return format_paper_answer(query)
-    return format_regulation_answer(query, hits, risk_result)
+    return format_regulation_answer(query, hits, risk_result, use_rerank, use_risk_calibration)

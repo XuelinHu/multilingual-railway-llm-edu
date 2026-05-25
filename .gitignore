@@ -39,7 +39,11 @@ htmlcov/
 .env.*
 
 # Generated data and indexes
-data/
+data/*
+!data/eval/
+!data/eval/**
+!data/sft/
+!data/sft/**
 output/
 
 # Local corpus files
@@ -47,3 +51,7 @@ corpus/*.docx
 corpus/*.doc
 corpus/*.pdf
 !corpus/README.md
+
+# Training artifacts
+checkpoints/
+experiments/lora/runs/

@@ -1,0 +1,12 @@
+{
+  "baseline": "lora::mock_adapter",
+  "samples": 6,
+  "EM": 0.0,
+  "F1": 0.214491,
+  "Rouge-L": 0.151569,
+  "terminology_consistency": 0.0,
+  "citation_correctness": 0.166667,
+  "abstention_correctness": 1.0,
+  "details_path": "experiments/rag_term_risk/answer_eval_details.jsonl",
+  "error_cases_path": "experiments/rag_term_risk/error_cases.jsonl"
+}

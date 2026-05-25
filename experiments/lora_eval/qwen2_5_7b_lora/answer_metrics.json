@@ -1,0 +1,12 @@
+{
+  "baseline": "lora::qwen2_5_7b_lora",
+  "samples": 6,
+  "EM": 0.0,
+  "F1": 0.075746,
+  "Rouge-L": 0.064357,
+  "terminology_consistency": 0.0,
+  "citation_correctness": 0.166667,
+  "abstention_correctness": 0.833333,
+  "details_path": "experiments/lora_eval/qwen2_5_7b_lora/answer_eval_details.jsonl",
+  "error_cases_path": "experiments/lora_eval/qwen2_5_7b_lora/error_cases.jsonl"
+}

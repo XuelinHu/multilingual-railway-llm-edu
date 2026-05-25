@@ -1,0 +1,8 @@
+{
+  "baseline": "rag_term_risk",
+  "evaluated_samples": 5,
+  "Recall@5": 0.8,
+  "MRR": 0.7,
+  "nDCG@5": 0.692812,
+  "details_path": "experiments/rag_term_risk/retrieval_eval_details.jsonl"
+}

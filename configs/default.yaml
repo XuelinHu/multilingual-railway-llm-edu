@@ -25,3 +25,12 @@ retrieval:
     min_df: 1
     lowercase: true
     sublinear_tf: true
+
+baselines:
+  default: rag_term_risk
+  available:
+    - retrieval_only
+    - rag_baseline
+    - rag_rerank
+    - rag_term
+    - rag_term_risk

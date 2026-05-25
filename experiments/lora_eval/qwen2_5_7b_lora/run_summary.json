@@ -1,0 +1,7 @@
+{
+  "adapter_dir": "/ds1/workspace/ai/multilingual-railway-llm-edu/experiments/lora/runs/qwen2_5_7b_lora",
+  "base_model": "Qwen/Qwen2.5-7B-Instruct",
+  "eval_samples": 6,
+  "output_path": "experiments/lora_eval/qwen2_5_7b_lora/predictions.jsonl",
+  "max_new_tokens": 256
+}
