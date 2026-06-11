@@ -1,5 +1,14 @@
 # multilingual-railway-llm-edu
 
+<p align="center">
+  <img height="20" src="https://img.shields.io/badge/python-3.10%2B-3776AB?logo=python&amp;logoColor=white" />
+  <img height="20" src="https://img.shields.io/badge/transformers-configured-FFD21E?logo=huggingface&amp;logoColor=black" />
+  <img height="20" src="https://img.shields.io/badge/QLoRA-configured-A020F0" />
+  <img height="20" src="https://img.shields.io/badge/FAISS-configured-0467DF" />
+  <img height="20" src="https://img.shields.io/badge/fastapi-0.111.0-009688?logo=fastapi&amp;logoColor=white" />
+  <img height="20" src="https://img.shields.io/badge/ruff-configured-D7FF64?logo=ruff&amp;logoColor=black" />
+</p>
+
 <<<<<<< HEAD
 面向留学生职业教育场景的多语种铁道知识教学大模型系统。系统围绕“中英双语术语学习、规章解读、教学问答、课堂出题、基于知识依据的回答”构建，默认优先适配单卡 RTX 3090 24GB。
 
