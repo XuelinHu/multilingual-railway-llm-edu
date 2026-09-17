@@ -224,7 +224,7 @@ python scripts/query_rag.py "What is the teaching focus of railway traction powe
 
 ```powershell
 $env:PYTHONPATH="src"
-python scripts/serve_rag.py --config configs/rag.yaml --port 8000
+python scripts/serve_rag.py --config configs/rag.yaml --port 8026
 ```
 
 Linux/macOS:
